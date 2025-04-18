@@ -3,6 +3,14 @@ from langgraph.graph import END, StateGraph
 from langchain.schema import SystemMessage,HumanMessage
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
+from langchain.schema.runnable import RunnableLambda
+from typing import TypedDict,Optional
+
+class ConversationState(TypedDict):
+    question: str
+    rude_reply:Optional[ str]
+    calm_reply: Optional[str]
+    conversation: Optional[str]
 
 load_dotenv()
 
@@ -19,42 +27,41 @@ def rude_agent(state):
     ]
     response= gemini_llm.invoke(message)
     return {"question": question, "rude_reply": response.content}
-
-    def calm_agent(state):
-        question = state['question']
-        messages=[
+def calm_agent(state):
+    question = state['question']
+    messages=[
             SystemMessage(content= "You are a calm agent who will always answer the question in a calm manner."),
             HumanMessage(content= question)
         ]
-        response= groq_llm.invoke(messages)
-        return {"question":question, "calm_reply": response.content}
+    response= groq_llm.invoke(messages)
+    return {"question":question, "calm_reply": response.content}
 
-    def combine(state):
-        return{
-            "chat": f"""
-            you: {state['question']}
-            gemeni(rude_agent):{state['rude_reply']}
-            groq(calm_agent): {state['calm_reply']}
+def combine(state):
+    return{
+        "conversation": f"""
+        you: {state['question']}
+        gemeni(rude_agent):{state['rude_reply']}
+        groq(calm_agent): {state['calm_reply']}
             """
         }
     
-    graph = StateGraph()
-    graph.add_node("rude", RunnableLambda(rude_agent))
-    graph.add_node("calm", RunnableLambda(calm_agent))
-    graph.add_node("chat", RunnableLambda(combine))
+graph = StateGraph(ConversationState)
+graph.add_node("rude", RunnableLambda(rude_agent))
+graph.add_node("calm", RunnableLambda(calm_agent))
+graph.add_node("chat", RunnableLambda(combine))
 
-    graph.set_entry_point("rude")
-    graph.add_edge("rude", "calm")
-    graph.add_edge("calm", "chat")
-    graph.add_edge("chat", END)
+graph.set_entry_point("rude")
+graph.add_edge("rude", "calm")
+graph.add_edge("calm", "chat")
+graph.add_edge("chat", END)
 
-    app= graph.compile()
+app= graph.compile()
 
-    while True:
-        question = input("You: ")
-        if question.lower() in ["exit", "quit"]:
-            print("See ya!")
+while True:
+    question = input("You: ")
+    if question.lower() in ["exit", "quit"]:
+        print("Thank you")
         break
 
-        output = app.invoke({"question": question})
-        print(output["chat"])
+    output = app.invoke({"question": question})
+    print(output['conversation'])
