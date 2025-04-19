@@ -30,7 +30,7 @@ def rude_agent(state):
 def calm_agent(state):
     question = state['question']
     messages=[
-            SystemMessage(content= "You are a calm agent who will always answer the question in a calm manner."),
+            SystemMessage(content= "You are a calm agent who will always answer the question in a calm manner.donot add extra answer"),
             HumanMessage(content= question)
         ]
     response= groq_llm.invoke(messages)
